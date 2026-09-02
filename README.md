@@ -50,7 +50,7 @@ Running on the real car. Version 0.17.8, **1,072 tests green** (991 physics, 50 
 | Units | **Done** - metric/imperial toggle; delta-V and Isp stay SI whatever it says |
 | Crash recovery | **Done** - an interrupted recording is resumed rather than fragmented; unproven in the field |
 | Layout on the head unit | **Verified 2026-08-24** - tuned layout, radar toggle, range control and collapsed/full-width switching all behave in accessory mode |
-| Absolute altitude | **Rebuilt on surveyed USGS data** - weather-independent by construction; the open question is network coverage on the ridge road, unverified on the road |
+| Absolute altitude | **Rebuilt on surveyed USGS data** - weather-independent by construction. Two things still unproven on the road: network coverage away from towns, and whether the 68 m round-trip drift is actually gone. See [Open questions](#open-questions) |
 | Public distribution | Source is MIT and public. The Play build is private internal testing only. |
 
 ### What is verified, and how
@@ -69,7 +69,7 @@ The physics module is pure Kotlin/JVM, so it needs **no Android SDK, no hardware
 car**. If you only want to read the model, start here:
 
 ```bash
-./gradlew :physics:test           # 949 tests, ~20 s
+./gradlew :physics:test           # 991 tests, ~20 s
 ./gradlew :app:testDebugUnitTest  # 50 tests
 ./gradlew :layout-harness:test    # 31 tests, the panel-preview tooling
 ./gradlew test                    # all three
