@@ -10,7 +10,7 @@ import kotlin.math.abs
  * Three charts, chosen because each answers a question the driver would act
  * on:
  *
- * - **Isp against speed** -- where the sweet spot is. Measured on a real the ridge road
+ * - **Isp against speed** -- where the sweet spot is. Measured on a real ridge-road
  *   drive there IS structure: a dip around 20-29 mph and peaks at 10-19 and
  *   50-59, so the chart shows something rather than a flat smear.
  * - **The delta-V waterfall** -- where the budget went, broken into aero,

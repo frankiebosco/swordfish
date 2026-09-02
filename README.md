@@ -28,11 +28,11 @@ thing anyone could contribute.**
 
 ## Status
 
-Running on the real car. Version 0.17.8, **1030 tests green** (949 physics, 50 app, 31 harness).
+Running on the real car. Version 0.17.8, **1,072 tests green** (991 physics, 50 app, 31 harness).
 
 | Piece | State |
 |---|---|
-| Physics core (`:physics`) | **Done** - 949 tests, no Android deps |
+| Physics core (`:physics`) | **Done** - 991 tests, no Android deps |
 | OBD-II PID decoders | **Done** - validated against the real car |
 | Vehicle survey | **Done** - 59 PIDs found by our own sweep; `docs/VEHICLE_SURVEY.md` |
 | Fuel tracking + grade estimation | **Done** - flow-integrating, slosh-filtered |
