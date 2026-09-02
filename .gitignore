@@ -1,0 +1,96 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# Android
+local.properties
+*.apk
+*.aab
+.cxx/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Captured OBD logs (may contain VIN / location traces)
+*.obdlog
+captures/
+
+# Probe logs pulled off the phone.
+#
+# Same reasoning as above: they carry the adapter's Bluetooth MAC, the
+# odometer reading, and raw MS-CAN frames. Useful evidence, not something to
+# publish. Findings belong in docs/; the raw files stay local.
+# Probe and drive logs, including milestone sessions. See the note at the
+# bottom of this file: a drive log is route data, and none of it is committed.
+tools/probe-logs/*
+
+# Android local SDK path (machine-specific)
+local.properties
+
+# Signing material. NEVER commit these.
+#
+# The upload keystore is the permanent identity of the app on Play: lose it
+# and dev.swordfish can never be updated again under that package name.
+# Back it up somewhere outside this repo (password manager / offline copy).
+*.jks
+*.keystore
+keystore.properties
+
+# Logs pulled off the phone with `adb pull`.
+#
+# SAME REASONING as tools/probe-logs above, and worth stating separately
+# because this directory did not exist when that rule was written.
+#
+# A drive log is a GPS trace of where the car has been -- which, for a car
+# parked at home every night, is a home address with timestamps. The MS-CAN
+# captures carry raw bus frames and the odometer. None of it belongs in a
+# public repo, and `git add -A` must never be able to sweep it in.
+#
+# Findings go in docs/MSCAN_SIGNALS.md; the raw files stay on this machine.
+logs/
+
+# Layout harness output. Regenerated in a second by
+# `./gradlew :layout-harness:run`; committing PNGs would bloat history for
+# something derivable. The harness SOURCE is committed.
+tools/layout-harness/out/
+
+# Personal drafts. Kept on disk, out of the repo -- these are Frank's to
+# publish or not, and a `git add -A` should not make that decision.
+docs/REDDIT_POST_DRAFT*.md
+
+# Personal prep and internal working notes. Kept on disk, out of the repo.
+#
+# These are about HOW THE WORK GETS PRESENTED, not about how it works:
+# speaking notes, what to say if challenged, what not to overclaim, and
+# session-to-session working state. None of it is useful to a reader of the
+# project, and all of it is Frank's to publish or not.
+#
+# Project knowledge belongs in README.md and the topic docs
+# (MSCAN_SIGNALS, VEHICLE_SURVEY, THE_JET_ANALOGY, ...). Keep the two apart.
+docs/DEMO_SCRIPT.md
+docs/demo-overlays.html
+docs/SESSION_HANDOFF_*.md
+
+# Kotlin incremental build state. Machine-local, not source.
+.kotlin/
+
+# Architecture and working notes for the AI assistant. Kept on disk, out of
+# the repo: it is session-to-session working state, not project knowledge a
+# reader needs, and it accumulates personal context by nature.
+CLAUDE.md
+
+# Raw drive captures and device logs. These are route data -- an altitude and
+# speed trace over time reconstructs where the car went, and every capture
+# starts and ends at home. Milestone notes belong in docs/ without the traces.
+tools/probe-logs/

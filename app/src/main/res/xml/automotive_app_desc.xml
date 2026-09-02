@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Declares which Android Auto capabilities this app provides.
+  "template" is the Car App Library surface.
+-->
+<automotiveApp>
+    <uses name="template" />
+</automotiveApp>

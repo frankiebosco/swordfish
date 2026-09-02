@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-only names.
+
+  The debug build installs as dev.swordfish.debug alongside the Play build,
+  so both appear in the phone launcher and in the DHU's nav-app list at the
+  same time. Renaming it is not cosmetic: picking the wrong one on the DHU
+  and concluding a change did or did not work would be an expensive
+  mistake, and the whole point of the suffix is that the two never get
+  juggled.
+-->
+<resources>
+    <string name="app_name">Swordfish DBG</string>
+    <string name="car_app_name">Swordfish DBG</string>
+</resources>

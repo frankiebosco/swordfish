@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      Car App Library permissions.
+
+      NAVIGATION_TEMPLATES unlocks NavigationTemplate / MapWithContentTemplate.
+      ACCESS_SURFACE is the one that actually lets us draw: without it the
+      host will not hand over a Surface, and the whole instrument panel is
+      impossible.
+
+      Declaring the NAVIGATION category (see the service below) is what makes
+      the app eligible to request these.
+    -->
+    <uses-permission android:name="androidx.car.app.NAVIGATION_TEMPLATES" />
+    <uses-permission android:name="androidx.car.app.ACCESS_SURFACE" />
+
+    <!--
+      Bluetooth for the OBD dongle.
+
+      Android 12 (API 31) split the old catch-all BLUETOOTH permission into
+      granular runtime permissions. minSdk is 28, so both the legacy and
+      modern forms are declared, with maxSdkVersion on the legacy pair so
+      they are not requested where they no longer apply.
+
+      neverForLocation is set because we do not derive location from
+      Bluetooth scanning — the phone's GPS handles position and altitude.
+      Without it, Android would require fine-location permission just to
+      scan, which would be a confusing prompt for a fuel gauge.
+    -->
+    <uses-permission android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" />
+
+    <!--
+      GPS altitude, for the grade estimator's slow-drift correction.
+
+      Android 12+ requires FINE and COARSE to be requested together, and the
+      user may grant only COARSE. That is survivable here: coarse location
+      still yields altitude, just less precisely, and the barometer carries
+      short-term grade anyway. The estimator already fuses both sources and
+      tolerates a noisy GPS altitude.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!--
+      Radar imagery from NOAA nowCOAST. The ONLY network the app performs:
+      everything else is Bluetooth to the dongle and sensors on the phone.
+
+      Without this every fetch throws SecurityException on a background
+      thread and the scope silently reports RADAR OFFLINE forever, which is
+      indistinguishable from a dead zone.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!--
+      Keeps the OBD poll running while the phone screen is off, which is the
+      normal case when it is projecting to the head unit.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@drawable/ic_launcher"
+        android:label="@string/app_name"
+        android:theme="@style/Theme.Swordfish">
+
+        <!--
+          Tells Android Auto this app has a car component and points at the
+          allowlist of hosts permitted to connect.
+        -->
+        <meta-data
+            android:name="androidx.car.app.minCarApiLevel"
+            android:value="1" />
+
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+
+        <!--
+          The head-unit entry point.
+
+          The NAVIGATION category is what grants access to NavigationTemplate
+          and its drawing Surface. Swordfish provides no turn-by-turn
+          guidance, which would fail Play Store criterion NF-6 — but NF-6 is
+          a manual-review requirement, not a framework one, and this app is
+          distributed via Internal App Sharing which bypasses review. See
+          docs/ANDROID_AUTO_RESEARCH.md.
+        -->
+        <service
+            android:name=".car.SwordfishCarAppService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="androidx.car.app.CarAppService" />
+                <category android:name="androidx.car.app.category.NAVIGATION" />
+            </intent-filter>
+        </service>
+
+        <!--
+          The bring-up probe. Phone-only by design: the head unit is one of
+          the things under test, so debugging the dongle over that same link
+          would confound the two. See ProbeActivity's class docs.
+        -->
+        <activity
+            android:name=".ui.ProbeActivity"
+            android:exported="false"
+            android:label="OBD Probe" />
+
+        <!--
+          The logbook. Phone-only, and deliberately so: reading back a drive
+          is a parked activity, and putting a directory of past journeys on
+          the head unit would invite exactly the behaviour the instrument
+          exists to avoid.
+        -->
+        <activity
+            android:name=".ui.LogbookActivity"
+            android:exported="false"
+            android:label="Logbook" />
+        <activity
+            android:name=".ui.DriveDetailActivity"
+            android:exported="false"
+            android:label="Drive" />
+
+        <!--
+          Keeps the OBD poll alive while the phone screen is off, which is
+          the normal state while projecting to the head unit. Android freezes
+          background threads otherwise, which would stop the poll every time
+          the display slept.
+        -->
+        <service
+            android:name=".obd.TelemetryService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
+        <!-- Phone-side configuration and debug view. -->
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

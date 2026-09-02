@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Launcher icon: a stylised delta-V readout on a dark ground.
+  Vector so it needs no density buckets.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#0B0E14"
+        android:pathData="M0,0h108v108h-108z" />
+    <!-- Delta glyph -->
+    <path
+        android:fillColor="#4CE0A0"
+        android:pathData="M54,26L74,68H34Z" />
+    <!-- Horizon line -->
+    <path
+        android:fillColor="#2A5A8C"
+        android:pathData="M22,78h64v5h-64z" />
+</vector>
