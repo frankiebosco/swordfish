@@ -1525,9 +1525,14 @@ class GaugeRenderer(private val carContext: CarContext) : SurfaceCallback {
 
         // The trip's STARTING budget, under the live figure -- the same
         // reference the instrument panel carries. 3075 alone says nothing;
-        // 3075 under START 7129 says the trip cost 4,054 m/s with no
+        // 3075 under START 3924 says the trip cost 849 m/s with no
         // arithmetic. Dropping it in radar mode would make the demoted
         // delta-V strictly less useful than the one it replaced.
+        //
+        // NOTE: the START value is latched only once the fuel tracker is
+        // seeded, so it is a real reading. The DISPLAYED delta-V above it is
+        // not gated that way: for the six handshake samples at the top of a
+        // session it renders a 7129 default. See README "Open questions".
         //
         // Plain type, not segments: it is a fixed reference, and segments
         // read as live data.

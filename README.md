@@ -28,11 +28,11 @@ thing anyone could contribute.**
 
 ## Status
 
-Running on the real car. Version 0.17.8, **1,072 tests green** (991 physics, 50 app, 31 harness).
+Running on the real car. Version 0.17.8, **1,075 tests green** (994 physics, 50 app, 31 harness).
 
 | Piece | State |
 |---|---|
-| Physics core (`:physics`) | **Done** - 991 tests, no Android deps |
+| Physics core (`:physics`) | **Done** - 994 tests, no Android deps |
 | OBD-II PID decoders | **Done** - validated against the real car |
 | Vehicle survey | **Done** - 59 PIDs found by our own sweep; `docs/VEHICLE_SURVEY.md` |
 | Fuel tracking + grade estimation | **Done** - flow-integrating, slosh-filtered |
@@ -40,7 +40,7 @@ Running on the real car. Version 0.17.8, **1,072 tests green** (991 physics, 50 
 | Live telemetry poller | **Done** - most-overdue scheduling, one-way degradation |
 | Android Auto app | **Done** - NavigationTemplate + Canvas, runs on real hardware |
 | Instrument panel | **Done** - navball, compass, stat rows; `docs/INSTRUMENT_PANEL.md` |
-| Delta-V budget | **Done** - drains monotonically, verified over 63 min |
+| Delta-V budget | **Done** - verified over 63 min; no single step over ~2 m/s in either direction |
 | Launcher tile on the car | **Done** - required a Play-attributed install |
 | Drive recording | **Done** - NDJSON per second, pulled with `tools/pull-probe.bat` |
 | MS-CAN access | **Working and dense** - 68k frames at ~76/sec. Two signals decoded: `215` four wheel speeds, `202` engine RPM + vehicle speed. Scale factor and left/right convention still need one calibration drive each; see [docs/MSCAN_SIGNALS.md](docs/MSCAN_SIGNALS.md) |
@@ -55,9 +55,21 @@ Running on the real car. Version 0.17.8, **1,072 tests green** (991 physics, 50 
 
 ### What is verified, and how
 
-The 2026-08-23 reference drive: 63.5 minutes, 3669 samples, 99.8% link uptime, no crashes,
-delta-V draining 7129 -> 3075 m/s, effectively monotonic -- zero large jumps, and 66
-increases with a median of +1.1 m/s, which is 0.02% of full scale and reads as tank slosh.
+The 2026-08-23 reference drive: 63.5 minutes, 3669 samples, 99.8% link uptime, 94.3%
+mount-calibrated, no crashes.
+
+The budget ran **3924 -> 3075 m/s**, and the useful claim is the step size rather than the
+span: across 3662 samples the **largest single increase was +1.23 m/s and the largest single
+decrease -2.12 m/s**. Nothing jumps. The small rises are tank slosh on corners, which is
+real and which the filter is allowed to show.
+
+**A caveat on the first eight seconds.** Until the OBD link finishes handshaking there is no
+tank reading, and the panel shows a default 7129 m/s -- six samples' worth. The first live
+sample reads 3924. An earlier version of this note quoted the drive as "7129 -> 3075", which
+counted that startup artifact as if it were fuel burned; it was not.
+
+Showing a default instead of a dash while the link is still handshaking is a real
+presentation bug and is listed under [Open questions](#open-questions).
 
 Raw drive logs are not committed. A drive log is a GPS trace, and for a car parked at home
 each night that is a home address with timestamps -- see [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -69,7 +81,7 @@ The physics module is pure Kotlin/JVM, so it needs **no Android SDK, no hardware
 car**. If you only want to read the model, start here:
 
 ```bash
-./gradlew :physics:test           # 991 tests, ~20 s
+./gradlew :physics:test           # 994 tests, ~20 s
 ./gradlew :app:testDebugUnitTest  # 50 tests
 ./gradlew :layout-harness:test    # 31 tests, the panel-preview tooling
 ./gradlew test                    # all three
@@ -332,6 +344,16 @@ recent last row is now resumed rather than orphaned.
 ## Open questions
 
 Nothing blocking, and the model itself is settled. What remains:
+
+- **The panel shows a default delta-V while the link is handshaking.** For the first six
+  samples of a session -- about eight seconds -- there is no tank reading yet, and the
+  budget renders as 7129 m/s rather than a dash. It then snaps to the real figure the
+  moment the link goes live. It looks like a 3200 m/s cliff in any plot of a raw log, and
+  it made an earlier version of the verification note above overstate the drive. The
+  readout should be blank until the tank reading exists. Note this is a DISPLAY problem
+  only: the trip-start reference is already gated on `fuelTracker.isSeeded` (GaugeScreen),
+  so `START` latches a real reading and the trip cost is computed correctly. It is the
+  live figure above it that renders a default.
 
 - **Absolute altitude drifts** - 68 m over a single drive that returned to the same spot.
   The barometer is referenced to the standard atmosphere and the GPS trim appeared never

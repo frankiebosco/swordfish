@@ -38,12 +38,19 @@ data class PanelState(
      * Delta-V at the start of this drive, m/s, or null before it is set.
      *
      * A jet's budget only means something against where it started. Seeing
-     * 3,075 tells you nothing on its own; seeing it under a 7,129 start
-     * tells you the trip cost 4,054 -- more than half the tank's budget.
-     * That comparison is the whole reward loop, and it was missing.
+     * 3,075 tells you nothing on its own; seeing it under a 3,924 start
+     * tells you the trip cost 849 m/s. That comparison is the whole reward
+     * loop, and it was missing.
      *
      * Captured once per drive on the first live sample, not on app launch:
      * the panel can be up for minutes in a driveway before anyone moves.
+     *
+     * The latch itself is gated on `fuelTracker.isSeeded` (see GaugeScreen),
+     * so it does NOT capture a pre-handshake placeholder. What the 2026-08-23
+     * log shows is the separate problem: the DISPLAYED delta-V renders a
+     * default 7129 for the six handshake samples before any tank reading
+     * exists, which makes a raw plot of that log look like a 3,200 m/s cliff.
+     * The readout wants a dash there -- see README "Open questions".
      */
     val tripStartDeltaV: Double? = null,
     val inFuelCutoff: Boolean = false,
