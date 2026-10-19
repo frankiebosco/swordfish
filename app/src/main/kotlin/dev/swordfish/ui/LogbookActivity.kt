@@ -10,6 +10,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import dev.swordfish.physics.ColdStart
 import dev.swordfish.physics.DisplayUnits
 import dev.swordfish.physics.DriveLog
 import dev.swordfish.physics.UnitSystem
@@ -79,6 +80,8 @@ class LogbookActivity : AppCompatActivity() {
             ))
             root.addView(spacer(18))
 
+            coldStartSection(entries)?.let { root.addView(it); root.addView(spacer(18)) }
+
             for (e in entries) {
                 root.addView(driveCard(e))
                 root.addView(spacer(10))
@@ -89,6 +92,52 @@ class LogbookActivity : AppCompatActivity() {
             setBackgroundColor(GROUND)
             addView(root)
         })
+    }
+
+    /**
+     * What cold starts cost across every listed drive, or null when too few
+     * drives can be measured to say anything.
+     *
+     * Built from the cached summaries, so it costs no extra file reads.
+     */
+    private fun coldStartSection(entries: List<DriveLibrary.Entry>): View? {
+        val results = entries.mapNotNull { it.summary?.coldStart }
+            .filter { it.excessFuelKg != null }
+        if (results.size < 3) return null
+
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        box.addView(heading("COLD STARTS", 15f))
+        box.addView(spacer(6))
+        box.addView(ColdStartView(this).apply {
+            this.results = results
+            this.units = this@LogbookActivity.units
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (220 * resources.displayMetrics.density).toInt()
+            )
+            setBackgroundColor(WELL)
+        })
+        box.addView(spacer(6))
+
+        val lines = ColdStart.bands(results).joinToString(separator = "\n") { b ->
+            val range = when {
+                b.fromC.isInfinite() -> "below ${DisplayUnits.temperature(b.toC, units)}"
+                b.toC.isInfinite() -> "${DisplayUnits.temperature(b.fromC, units)}+"
+                else -> "${DisplayUnits.temperature(b.fromC, units).value}–" +
+                    "${DisplayUnits.temperature(b.toC, units)}"
+            }
+            val cost = DisplayUnits.smallFuelVolume(b.medianExcessKg.coerceAtLeast(0.0), units)
+            val warm = b.medianWarmUpSeconds?.let { "${"%.1f".format(it / 60.0)} min" } ?: "—"
+            "start $range: ~$cost, warm-up $warm  (${b.drives})"
+        }
+        box.addView(body(lines, 12f).apply { typeface = Typeface.MONOSPACE })
+        box.addView(spacer(4))
+        box.addView(body(
+            "Each dot is a drive: extra fuel burned while warming up, against " +
+                "that drive's own warm running. Lines mark the median per band.",
+            11f
+        ))
+        return box
     }
 
     /** One drive, as a tappable summary card. */

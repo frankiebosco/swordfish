@@ -45,8 +45,10 @@ data class PanelState(
      * Captured once per drive on the first live sample, not on app launch:
      * the panel can be up for minutes in a driveway before anyone moves.
      *
-     * The latch itself is gated on `fuelTracker.isSeeded` (see GaugeScreen),
-     * so it does NOT capture a pre-handshake placeholder. What the 2026-08-23
+     * The latch itself is gated on `fuelTracker.isConfirmed` (see
+     * GaugeScreen), so it does NOT capture a pre-handshake placeholder, nor
+     * a carried-over figure the tank has not yet checked -- on a fill-up day
+     * that would freeze the pre-fill budget as "start". What the 2026-08-23
      * log shows is the separate problem: the DISPLAYED delta-V renders a
      * default 7129 for the six handshake samples before any tank reading
      * exists, which makes a raw plot of that log look like a 3,200 m/s cliff.

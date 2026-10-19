@@ -10,11 +10,13 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import dev.swordfish.physics.ColdStart
 import dev.swordfish.physics.DisplayUnits
 import dev.swordfish.physics.DriveCharts
 import dev.swordfish.physics.DriveLog
 import dev.swordfish.physics.DriveTrack
 import dev.swordfish.physics.Units
+import dev.swordfish.physics.Vehicle
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -153,6 +155,52 @@ class DriveDetailActivity : AppCompatActivity() {
                 root.addView(statRow(
                     "Max coolant", DisplayUnits.temperature(it, u).toString()
                 ))
+            }
+        }
+
+        // --- cold start ---
+        summary.coldStart?.let { cs ->
+            root.addView(spacer(18))
+            root.addView(sectionHeading("COLD START"))
+            root.addView(statRow(
+                "Started at", DisplayUnits.temperature(cs.startCoolantC, u).toString()
+            ))
+            if (cs.startedWarm) {
+                root.addView(body("Engine already warm — no warm-up cost.", 11f))
+            } else {
+                val warmTo = DisplayUnits.temperature(ColdStart.WARM_C, u)
+                root.addView(statRow(
+                    "Warm-up",
+                    cs.warmUpSeconds?.let { "${"%.1f".format(it / 60.0)} min to $warmTo" }
+                        ?: "never reached $warmTo"
+                ))
+                val excess = cs.excessFuelKg
+                if (excess != null) {
+                    val kg = excess.coerceAtLeast(0.0)
+                    val payload = Prefs(this).buildPayload()
+                    val dv = ColdStart.excessDeltaV(
+                        Vehicle.ND2_CLUB.copy(payload = payload),
+                        // Weak dependence on fuel aboard (it is ~2% of the
+                        // mass), so the first tank reading is close enough.
+                        DriveLog.parse(lines).firstNotNullOfOrNull { it.fuelRemainingKg } ?: 15.0,
+                        kg
+                    )
+                    root.addView(statRow(
+                        "Extra fuel",
+                        "~${DisplayUnits.smallFuelVolume(kg, u)}  (≈${"%.0f".format(dv)} m/s Δv)"
+                    ))
+                    root.addView(body(
+                        "Fuel burned while warming up beyond what this same drive " +
+                            "used once warm. Approximate: the first roads of a trip " +
+                            "are usually slower ones.",
+                        11f
+                    ))
+                } else {
+                    root.addView(body(
+                        "Not enough warm driving afterwards to measure the cost against.",
+                        11f
+                    ))
+                }
             }
         }
 

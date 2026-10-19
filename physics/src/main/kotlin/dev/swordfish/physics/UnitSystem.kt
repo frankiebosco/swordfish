@@ -96,6 +96,19 @@ object DisplayUnits {
     }
 
     /** Temperature from Celsius. */
+    /**
+     * A SMALL fuel quantity -- tens of millilitres, like a warm-up's waste.
+     *
+     * [fuelVolume] would print 80 mL as "0.1 L" or "0.02 gal", which hides
+     * the number entirely. Millilitres and fluid ounces keep it readable.
+     */
+    fun smallFuelVolume(kg: Double, system: UnitSystem): Measure = when (system) {
+        UnitSystem.IMPERIAL ->
+            Measure("%.1f".format(Units.kgToGallons(kg) * FL_OZ_PER_GALLON), "fl oz")
+        UnitSystem.METRIC ->
+            Measure("%.0f".format(Units.kgToGallons(kg) * LITRES_PER_GALLON * 1000.0), "mL")
+    }
+
     fun temperature(celsius: Double, system: UnitSystem): Measure = when (system) {
         UnitSystem.IMPERIAL ->
             Measure("%.0f".format(celsius * 9.0 / 5.0 + 32.0), "°F")
@@ -147,5 +160,8 @@ object DisplayUnits {
 
     const val FEET_PER_METER = 3.280839895
     const val LITRES_PER_GALLON = 3.785411784
+
+    /** US fluid ounces in a US gallon. */
+    const val FL_OZ_PER_GALLON = 128.0
     const val KM_PER_MILE = 1.609344
 }

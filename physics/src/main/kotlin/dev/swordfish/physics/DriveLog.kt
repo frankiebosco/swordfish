@@ -73,7 +73,9 @@ object DriveLog {
         val minAltitudeM: Double?,
         val maxAltitudeM: Double?,
         val maxCoolantC: Double?,
-        val samplesWithFix: Int
+        val samplesWithFix: Int,
+        /** Warm-up cost, against this drive's own warm phase. See [ColdStart]. */
+        val coldStart: ColdStart.Result? = null
     ) {
         val durationMs: Long get() = endedAtMs - startedAtMs
 
@@ -221,7 +223,8 @@ object DriveLog {
             minAltitudeM = minAlt,
             maxAltitudeM = maxAlt,
             maxCoolantC = maxCoolant,
-            samplesWithFix = fixes
+            samplesWithFix = fixes,
+            coldStart = ColdStart.analyse(samples)
         )
     }
 

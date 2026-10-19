@@ -28,11 +28,11 @@ thing anyone could contribute.**
 
 ## Status
 
-Running on the real car. Version 0.17.8, **1,075 tests green** (994 physics, 50 app, 31 harness).
+Running on the real car. Version 0.17.12, **1,110 tests green** (1,029 physics, 50 app, 31 harness).
 
 | Piece | State |
 |---|---|
-| Physics core (`:physics`) | **Done** - 994 tests, no Android deps |
+| Physics core (`:physics`) | **Done** - 1,029 tests, no Android deps |
 | OBD-II PID decoders | **Done** - validated against the real car |
 | Vehicle survey | **Done** - 59 PIDs found by our own sweep; `docs/VEHICLE_SURVEY.md` |
 | Fuel tracking + grade estimation | **Done** - flow-integrating, slosh-filtered |
@@ -81,7 +81,7 @@ The physics module is pure Kotlin/JVM, so it needs **no Android SDK, no hardware
 car**. If you only want to read the model, start here:
 
 ```bash
-./gradlew :physics:test           # 994 tests, ~20 s
+./gradlew :physics:test           # 1,029 tests, ~20 s
 ./gradlew :app:testDebugUnitTest  # 50 tests
 ./gradlew :layout-harness:test    # 31 tests, the panel-preview tooling
 ./gradlew test                    # all three

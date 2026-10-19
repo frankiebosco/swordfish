@@ -188,4 +188,127 @@ class FuelTrackerTest {
         assertTrue(t.fuelGallons() > start, "never corrected toward the sensor")
     }
 
+
+    // --- One poll is one reading, and the carried-over seed (2026-10-19) ---
+
+    private fun capacityKg() = Units.gallonsToKg(Units.litersToGallons(car.tankCapacityL))
+
+    @Test
+    fun `the same poll handed back five times does not seed`() {
+        // The real bug: GaugeScreen asks every frame (20 fps), the cursor
+        // returns the cached 10 s poll, so one reading passed as five and
+        // the slosh guard never ran.
+        val t = FuelTracker(car)
+        repeat(5) { t.seed(0.5, readingAtMillis = 1_000L) }
+        assertFalse(t.isSeeded, "seeded from a single poll counted five times")
+    }
+
+    @Test
+    fun `five distinct polls do seed`() {
+        val t = FuelTracker(car)
+        for (i in 0 until 5) {
+            // Each poll is asked for several frames running, as on the car.
+            repeat(20) { t.seed(0.5, readingAtMillis = i * 10_000L) }
+        }
+        assertTrue(t.isSeeded)
+        assertTrue(t.isConfirmed)
+        assertEquals(FuelTracker.Confirmation.SEEDED_FROM_TANK, t.lastConfirmation)
+    }
+
+    @Test
+    fun `a carried-over figure is used at once but not yet confirmed`() {
+        val t = FuelTracker(car)
+        t.carryOver(20.0)
+        assertTrue(t.isSeeded, "carried figure should drive the display immediately")
+        assertFalse(t.isConfirmed, "must not latch the trip start before the tank checks it")
+        assertTrue(t.wantsSeedReadings)
+        assertEquals(20.0, t.fuelKg, 1e-9)
+    }
+
+    @Test
+    fun `the tank agreeing keeps the carried figure, not the tank's`() {
+        // Within the threshold the carried figure is the better estimate --
+        // it has a whole drive of filtering behind it. Readings ~3 kg high
+        // are the 2026-09-16 case: seeding from them is what made delta-V
+        // climb 227 m/s after an early idle stop.
+        val t = FuelTracker(car)
+        t.carryOver(20.0)
+        val f = 23.0 / capacityKg()
+        for (i in 0 until 5) t.seed(f, readingAtMillis = i * 10_000L)
+        assertTrue(t.isConfirmed)
+        assertEquals(20.0, t.fuelKg, 1e-9)
+        assertEquals(FuelTracker.Confirmation.CARRY_OVER_KEPT, t.lastConfirmation)
+        assertFalse(t.wantsSeedReadings)
+    }
+
+    @Test
+    fun `a fill-up overrides the carried figure`() {
+        // Smallest fill-up in the logs was +8.5 kg; typical were +20 kg.
+        val t = FuelTracker(car)
+        t.carryOver(8.0)
+        val full = 30.0 / capacityKg()
+        for (i in 0 until 5) t.seed(full, readingAtMillis = i * 10_000L)
+        assertTrue(t.isConfirmed)
+        assertEquals(30.0, t.fuelKg, 0.01)
+        assertEquals(FuelTracker.Confirmation.TANK_OVERRODE_CARRY_OVER, t.lastConfirmation)
+    }
+
+    @Test
+    fun `driving without the app is caught too`() {
+        // The tank reading far BELOW the carried figure means fuel was burned
+        // that the tracker never saw. The tank wins in that direction as well.
+        val t = FuelTracker(car)
+        t.carryOver(28.0)
+        val low = 15.0 / capacityKg()
+        for (i in 0 until 5) t.seed(low, readingAtMillis = i * 10_000L)
+        assertEquals(15.0, t.fuelKg, 0.01)
+        assertEquals(FuelTracker.Confirmation.TANK_OVERRODE_CARRY_OVER, t.lastConfirmation)
+    }
+
+    @Test
+    fun `the threshold sits between normal noise and the smallest fill-up`() {
+        // From the logs: no-fill disagreement ran -5.3 to +4.5 kg; the
+        // smallest fill-up was +8.5 kg.
+        val threshold = FuelTracker.CARRY_OVER_REJECT_FRACTION * capacityKg()
+        assertTrue(threshold > 5.3, "threshold $threshold kg would treat noise as a fill-up")
+        assertTrue(threshold < 8.5, "threshold $threshold kg would miss a real fill-up")
+    }
+
+    @Test
+    fun `a sloshing check of a carried figure waits rather than deciding`() {
+        val t = FuelTracker(car)
+        t.carryOver(20.0)
+        var ms = 0L
+        for (f in listOf(0.32, 0.90, 0.45, 0.78, 0.35, 0.88)) {
+            t.seed(f, readingAtMillis = ms); ms += 10_000L
+        }
+        assertFalse(t.isConfirmed)
+        assertEquals(20.0, t.fuelKg, 1e-9)
+    }
+
+    @Test
+    fun `burn during the check is not lost when the carried figure is kept`() {
+        val t = FuelTracker(car)
+        t.carryOver(20.0)
+        t.update(fuelFlowKgPerSec = 0.001, speedMps = 0.0, dtSec = 50.0)
+        val f = 20.0 / capacityKg()
+        for (i in 0 until 5) t.seed(f, readingAtMillis = i * 10_000L)
+        assertEquals(19.95, t.fuelKg, 1e-9)
+    }
+
+    @Test
+    fun `carry-over is ignored once seeded, and when implausible`() {
+        val seeded = FuelTracker(car)
+        repeat(5) { seeded.seed(0.5) }
+        val before = seeded.fuelKg
+        seeded.carryOver(5.0)
+        assertEquals(before, seeded.fuelKg, 1e-9)
+
+        for (bad in listOf(-1.0, Double.NaN, Double.POSITIVE_INFINITY, capacityKg() + 1.0)) {
+            val t = FuelTracker(car)
+            t.carryOver(bad)
+            assertFalse(t.isSeeded, "accepted an implausible carried figure $bad")
+        }
+    }
+
 }

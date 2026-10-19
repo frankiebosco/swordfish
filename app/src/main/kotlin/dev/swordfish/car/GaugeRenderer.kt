@@ -14,6 +14,8 @@ import dev.swordfish.physics.MountAutoCalibrator
 import dev.swordfish.physics.NavballScale
 import dev.swordfish.physics.OperatingState
 import dev.swordfish.physics.SevenSegment
+import dev.swordfish.physics.StatRow
+import dev.swordfish.physics.StatSelection
 import dev.swordfish.physics.DisplayTheme
 import dev.swordfish.physics.PanelLayout
 import dev.swordfish.physics.RadarLayout
@@ -60,6 +62,13 @@ class GaugeRenderer(private val carContext: CarContext) : SurfaceCallback {
     /** Draw the faint scanline overlay. */
     @Volatile
     var scanlines: Boolean = true
+
+    /**
+     * Which stats-column rows the driver chose to show. Display only; the
+     * recorder logs everything. Set from Prefs at screen creation.
+     */
+    @Volatile
+    var statSelection: StatSelection = StatSelection.ALL
 
     @Volatile
     var theme: DisplayTheme = DisplayTheme.DEFAULT
@@ -1715,7 +1724,7 @@ class GaugeRenderer(private val carContext: CarContext) : SurfaceCallback {
         // its own readout in the centre column -- and at half width the row
         // could not fit four cells without them running into each other.
         // It stays in the WIDE stats column, which has room.
-        val rows = statRows(s).filterNot { it.first == "TWR" }
+        val rows = statRows(s).filterNot { it.first == StatRow.TWR.label }
             .take(PanelLayout.NARROW_STAT_CELLS)
         if (rows.isEmpty()) return
 
@@ -1807,15 +1816,31 @@ class GaugeRenderer(private val carContext: CarContext) : SurfaceCallback {
         }
     }
 
-    /** The secondary readouts, in priority order. */
-    private fun statRows(s: PanelState): List<Pair<String, String>> = buildList {
-        s.gear?.let { add("GEAR" to it.toString()) }
-        s.rpm?.let { add("RPM" to GaugeFormat.formatInteger(Math.round(it))) }
+    /**
+     * The secondary readouts, in priority order, minus any the driver has
+     * hidden.
+     *
+     * Each row is tagged with its [StatRow] and filtered against
+     * [statSelection] in one place, so the wide column and the narrow strip
+     * cannot disagree about what is shown. The label printed is the enum's,
+     * which is what the phone settings screen lists.
+     */
+    private fun statRows(s: PanelState): List<Pair<String, String>> {
+        val selection = statSelection
+        return allStatRows(s)
+            .filter { (row, _) -> selection.isVisible(row) }
+            .map { (row, value) -> row.label to value }
+    }
+
+    /** Every readout that currently has data, before the driver's selection. */
+    private fun allStatRows(s: PanelState): List<Pair<StatRow, String>> = buildList {
+        s.gear?.let { add(StatRow.GEAR to it.toString()) }
+        s.rpm?.let { add(StatRow.RPM to GaugeFormat.formatInteger(Math.round(it))) }
         // TWR as a percentage rather than a fraction. "0.15" needs a decimal
         // point that is only ~4px across at stat-row size and cannot be read;
         // "15%" needs none and says the same thing. Percentages are also the
         // more natural way to hear it -- 15% of the thrust needed to hover.
-        s.twr?.let { add("TWR" to "${"%.0f".format(it * 100)}%") }
+        s.twr?.let { add(StatRow.TWR to "${"%.0f".format(it * 100)}%") }
         // Fuel in LITRES, not gallons.
         //
         // Gallons need a tenth to be useful ("9.9"), and the decimal point is
@@ -1826,14 +1851,14 @@ class GaugeRenderer(private val carContext: CarContext) : SurfaceCallback {
         // It also matches the rest of the panel, which is already SI: speed
         // and delta-V are both in m/s.
         s.fuelGallons?.let {
-            add("FUEL" to "${"%.0f".format(Units.gallonsToLiters(it))} L")
+            add(StatRow.FUEL to "${"%.0f".format(Units.gallonsToLiters(it))} L")
         }
         // Mass in kg, for the same reason fuel is in litres: the panel is SI
         // throughout, and kg needs no more digits than lb.
         s.totalMassKg?.let {
-            add("MASS" to "${GaugeFormat.formatInteger(Math.round(it))} kg")
+            add(StatRow.MASS to "${GaugeFormat.formatInteger(Math.round(it))} kg")
         }
-        s.thermalEfficiency?.let { add("EFF" to "${"%.0f".format(it * 100)}%") }
+        s.thermalEfficiency?.let { add(StatRow.EFF to "${"%.0f".format(it * 100)}%") }
         // Altitude, in whole metres.
         //
         // A KSP panel without an altimeter is a strange omission, and this
@@ -1846,7 +1871,7 @@ class GaugeRenderer(private val carContext: CarContext) : SurfaceCallback {
         // any barometric altitude anyway. Placed AFTER the first four rows
         // so it is the narrow layout that drops it, not RPM.
         s.altitudeM?.let {
-            add("ALT" to "${GaugeFormat.formatInteger(Math.round(it))} m")
+            add(StatRow.ALT to "${GaugeFormat.formatInteger(Math.round(it))} m")
         }
         // Electrical. The ND has no voltmeter, and a factory one would be
         // useless anyway: it reads 13.5-14.5 V for the whole drive. What is
@@ -1855,11 +1880,11 @@ class GaugeRenderer(private val carContext: CarContext) : SurfaceCallback {
         //
         // One decimal because the interesting range is narrow: 12.2 V and
         // 12.7 V are half a tank of charge apart.
-        s.busVolts?.let { add("VOLTS" to "%.1f".format(it)) }
+        s.busVolts?.let { add(StatRow.VOLTS to "%.1f".format(it)) }
         // Coolant is the same story: the stock needle sits dead centre
         // across the entire 88-100 C a warm engine occupies.
         s.coolantC?.let {
-            add("TEMP" to "${GaugeFormat.formatInteger(Math.round(it))} C")
+            add(StatRow.TEMP to "${GaugeFormat.formatInteger(Math.round(it))} C")
         }
     }
 

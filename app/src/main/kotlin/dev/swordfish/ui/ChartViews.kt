@@ -8,6 +8,8 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import android.view.View
 import dev.swordfish.physics.ChartScale
+import dev.swordfish.physics.ColdStart
+import dev.swordfish.physics.DisplayUnits
 import dev.swordfish.physics.DriveCharts
 import dev.swordfish.physics.Units
 import dev.swordfish.physics.UnitSystem
@@ -283,5 +285,97 @@ class StatePieView(context: Context) : View(context) {
             )
             y += 36f
         }
+    }
+}
+
+/**
+ * What a cold start costs, across every drive -- the logbook's one
+ * cross-drive chart.
+ *
+ * Each dot is a drive: starting coolant across, extra fuel burned while
+ * warming up (against that drive's own warm phase) up the side. The lit
+ * segments are the median in each starting-temperature band, so the
+ * staircase reads at a glance even when single drives scatter.
+ */
+class ColdStartView(context: Context) : View(context) {
+
+    var results: List<ColdStart.Result> = emptyList()
+        set(v) { field = v.filter { it.excessFuelKg != null }; invalidate() }
+
+    var units: UnitSystem = UnitSystem.DEFAULT
+        set(v) { field = v; invalidate() }
+
+    private val label = ChartStyle.text(24f, ChartStyle.DIM)
+    private val labelRight = ChartStyle.text(24f, ChartStyle.DIM, Paint.Align.RIGHT)
+    private val centred = ChartStyle.text(24f, ChartStyle.DIM, Paint.Align.CENTER)
+    private val grid = ChartStyle.stroke(ChartStyle.GRID, 1.5f)
+    private val dot = ChartStyle.fill(ChartStyle.PHOSPHOR)
+    private val warmDot = ChartStyle.fill(ChartStyle.DIM)
+    private val median = ChartStyle.stroke(ChartStyle.BRIGHT, 5f)
+
+    /** Y values in the display unit: mL or fl oz. */
+    private fun yValue(kg: Double): Double =
+        DisplayUnits.smallFuelVolume(kg.coerceAtLeast(0.0), units).value.toDouble()
+
+    private fun xValue(c: Double): Double = when (units) {
+        UnitSystem.IMPERIAL -> c * 9.0 / 5.0 + 32.0
+        UnitSystem.METRIC -> c
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
+        if (results.size < 3) {
+            canvas.drawText("NOT ENOUGH DRIVES YET", 24f, height / 2f, label)
+            return
+        }
+
+        val leftPad = 84f
+        val bottomPad = 50f
+        val topPad = 34f
+        val plotW = width - leftPad - 20f
+        val plotH = height - bottomPad - topPad
+        if (plotW <= 0 || plotH <= 0) return
+
+        val xs = results.map { xValue(it.startCoolantC) }
+        val ys = results.map { yValue(it.excessFuelKg!!) }
+        val xAxis = ChartScale.niceAxis(xs.min(), xs.max(), targetTicks = 5, includeZero = false)
+        // includeZero: a warm start costs nothing, and the chart must show that.
+        val yAxis = ChartScale.niceAxis(0.0, ys.max(), targetTicks = 4, includeZero = true)
+
+        fun px(x: Double) = leftPad + plotW * xAxis.fraction(x).toFloat()
+        fun py(y: Double) = topPad + plotH * (1.0 - yAxis.fraction(y)).toFloat()
+
+        for (t in yAxis.ticks) {
+            val y = py(t)
+            canvas.drawLine(leftPad, y, leftPad + plotW, y, grid)
+            canvas.drawText(ChartScale.formatTick(t), leftPad - 10f, y + 8f, labelRight)
+        }
+        for (t in xAxis.ticks) {
+            canvas.drawText(ChartScale.formatTick(t), px(t), height - 16f, centred)
+        }
+
+        val radius = 6f
+        for ((i, r) in results.withIndex()) {
+            canvas.drawCircle(px(xs[i]), py(ys[i]), radius, if (r.startedWarm) warmDot else dot)
+        }
+
+        // Band edges are open-ended (the coldest and warmest bands run to
+        // infinity), so each median segment spans only the drives it covers.
+        val cMin = results.minOf { it.startCoolantC }
+        val cMax = results.maxOf { it.startCoolantC }
+        for (b in ColdStart.bands(results)) {
+            val x0 = px(xValue(maxOf(b.fromC, cMin)))
+            val x1 = px(xValue(minOf(b.toC, cMax)))
+            val y = py(yValue(b.medianExcessKg))
+            canvas.drawLine(x0, y, x1, y, median)
+        }
+
+        val yUnit = DisplayUnits.smallFuelVolume(0.0, units).unit
+        val xUnit = DisplayUnits.temperature(0.0, units).unit
+        canvas.drawText("extra fuel, $yUnit", leftPad, topPad - 10f, ChartStyle.text(22f, ChartStyle.PHOSPHOR))
+        canvas.drawText(
+            "start $xUnit", leftPad + plotW, topPad - 10f,
+            ChartStyle.text(22f, ChartStyle.DIM, Paint.Align.RIGHT)
+        )
     }
 }

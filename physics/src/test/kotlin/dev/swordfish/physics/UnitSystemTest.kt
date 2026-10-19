@@ -122,4 +122,17 @@ class UnitSystemTest {
             "DisplayUnits should not convert delta-V or Isp"
         )
     }
+
+    @Test
+    fun `small fuel volumes stay readable in both systems`() {
+        // 80 mL of gasoline: what a cold start costs. fuelVolume would show
+        // this as 0.1 L / 0.02 gal, which is no number at all.
+        val kg = Units.gallonsToKg(0.080 / DisplayUnits.LITRES_PER_GALLON)
+        val metric = DisplayUnits.smallFuelVolume(kg, UnitSystem.METRIC)
+        assertEquals("80", metric.value)
+        assertEquals("mL", metric.unit)
+        val imperial = DisplayUnits.smallFuelVolume(kg, UnitSystem.IMPERIAL)
+        assertEquals("2.7", imperial.value)
+        assertEquals("fl oz", imperial.unit)
+    }
 }

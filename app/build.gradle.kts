@@ -22,8 +22,8 @@ android {
         // because the host rebinds instantly. A changed versionCode is the
         // cheap way to make it reload without dropping the DHU connection.
         // See tools/reload.bat.
-        versionCode = 81
-        versionName = "0.17.11"
+        versionCode = 82
+        versionName = "0.17.12"
     }
 
     // Release signing for Play Internal App Sharing.

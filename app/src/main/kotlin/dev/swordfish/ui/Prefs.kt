@@ -7,6 +7,7 @@ import dev.swordfish.physics.DisplayTheme
 import dev.swordfish.physics.Occupant
 import dev.swordfish.physics.Payload
 import dev.swordfish.physics.RadarLayout
+import dev.swordfish.physics.StatSelection
 import dev.swordfish.physics.UnitSystem
 import dev.swordfish.physics.Units
 
@@ -179,6 +180,48 @@ class Prefs(context: Context) {
             sp.edit().putBoolean(KEY_PAX_EXACT, value).apply()
         }
 
+    /**
+     * Which rows the head unit's stats column shows.
+     *
+     * Display only -- the drive log records every field whatever this says.
+     * Unset means every row, so an upgrade changes nothing until the driver
+     * chooses. See [StatSelection].
+     */
+    var statSelection: StatSelection
+        get() = StatSelection.decode(sp.getString(KEY_STAT_ROWS, null))
+        set(value) {
+            sp.edit().putString(KEY_STAT_ROWS, value.encode()).apply()
+        }
+
+    /**
+     * The fuel tracker's latest estimate, carried into the next drive.
+     *
+     * Written every ~30 s while driving and when the car screen closes, so a
+     * crash loses half a minute of burn at most. See `FuelTracker.carryOver`
+     * for why a parked car's last estimate beats its first tank reading.
+     */
+    fun saveFuelEstimate(kg: Double, atMillis: Long) {
+        if (!kg.isFinite() || kg < 0.0) return
+        sp.edit()
+            .putFloat(KEY_FUEL_EST_KG, kg.toFloat())
+            .putLong(KEY_FUEL_EST_AT, atMillis)
+            .apply()
+    }
+
+    /**
+     * The carried-over estimate, or null if none is stored or it is older
+     * than [MAX_FUEL_CARRY_AGE_MS] -- long enough that the car has plausibly
+     * been driven without the app, so the tank should decide afresh. A
+     * timestamp from the future (clock change) is treated as unusable too.
+     */
+    fun carriedFuelKg(nowMillis: Long): Double? {
+        if (!sp.contains(KEY_FUEL_EST_KG)) return null
+        val at = sp.getLong(KEY_FUEL_EST_AT, 0L)
+        val age = nowMillis - at
+        if (age < 0L || age > MAX_FUEL_CARRY_AGE_MS) return null
+        return sp.getFloat(KEY_FUEL_EST_KG, 0f).toDouble()
+    }
+
     /** Cargo in pounds. Zero means an empty boot. */
     var cargoLb: Double
         get() = sp.getFloat(KEY_CARGO_LB, 0f).toDouble()
@@ -229,5 +272,11 @@ class Prefs(context: Context) {
         private const val KEY_PAX_LB = "pax_lb"
         private const val KEY_PAX_EXACT = "pax_exact"
         private const val KEY_CARGO_LB = "cargo_lb"
+        private const val KEY_STAT_ROWS = "stat_rows"
+        private const val KEY_FUEL_EST_KG = "fuel_estimate_kg"
+        private const val KEY_FUEL_EST_AT = "fuel_estimate_at_ms"
+
+        /** Seven days. Beyond that the tank seeds afresh. */
+        const val MAX_FUEL_CARRY_AGE_MS = 7L * 24 * 60 * 60 * 1000
     }
 }

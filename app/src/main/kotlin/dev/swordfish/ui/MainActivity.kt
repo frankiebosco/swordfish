@@ -24,6 +24,7 @@ import dev.swordfish.physics.DeltaVModel
 import dev.swordfish.physics.DisplayTheme
 import dev.swordfish.physics.OrbitalScale
 import dev.swordfish.physics.PollSchedule
+import dev.swordfish.physics.StatRow
 import dev.swordfish.physics.Telemetry
 import dev.swordfish.physics.Thermodynamics
 import dev.swordfish.physics.Thrust
@@ -69,6 +70,18 @@ class MainActivity : AppCompatActivity() {
         root.addView(toggle("Scanlines", prefs.scanlines) {
             prefs.scanlines = it
         })
+
+        root.addView(spacer(22))
+        root.addView(heading("SIDEBAR READOUTS", 15f))
+        root.addView(spacer(4))
+        root.addView(body(
+            "Which rows the right-hand column shows. Fewer rows are drawn " +
+                "larger. Hidden rows are still recorded in the logbook. " +
+                "Split screen shows the first three that are on.",
+            11f
+        ))
+        root.addView(spacer(6))
+        for (row in StatRow.entries) root.addView(statToggle(row))
 
         root.addView(spacer(10))
         root.addView(body("Changes apply when the car screen is next opened.", 11f))
@@ -296,6 +309,30 @@ class MainActivity : AppCompatActivity() {
         setOnClickListener {
             prefs.displayTheme = t
             recreate()
+        }
+    }
+
+    /**
+     * One stats-column row. The last visible row cannot be unticked -- an
+     * empty column reads as a fault, not a choice -- so the box snaps back
+     * and says why.
+     */
+    private fun statToggle(row: StatRow) = CheckBox(this).apply {
+        text = "${row.label}  —  ${row.description}"
+        textSize = 14f
+        isChecked = prefs.statSelection.isVisible(row)
+        setTextColor(themeColour(prefs.displayTheme.mid))
+        setOnCheckedChangeListener { box, checked ->
+            val current = prefs.statSelection
+            if (!checked && current.isLastVisible(row)) {
+                box.isChecked = true
+                android.widget.Toast.makeText(
+                    this@MainActivity, "At least one readout must stay on.",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+                return@setOnCheckedChangeListener
+            }
+            prefs.statSelection = if (checked) current.with(row) else current.without(row)
         }
     }
 

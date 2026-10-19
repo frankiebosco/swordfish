@@ -25,6 +25,7 @@ class SwordfishSession : Session() {
         val prefs = Prefs(carContext)
         r.ghostSegments = prefs.ghostSegments
         r.scanlines = prefs.scanlines
+        r.statSelection = prefs.statSelection
         r.theme = prefs.displayTheme
         renderer = r
         return GaugeScreen(carContext, r)

@@ -136,6 +136,7 @@ class GaugeScreen(
     private val fuelTracker = FuelTracker(car)
 
     private var lastFuelUpdateNanos = 0L
+    private var lastFuelSaveAt = 0L
 
     /**
      * Delta-V when this drive began, for the panel's START readout.
@@ -184,6 +185,7 @@ class GaugeScreen(
                 renderer.centreContent = prefs.centreContent
                 renderer.radarRangeMiles = prefs.radarRangeMiles
                 renderer.unitSystem = prefs.unitSystem
+                renderer.statSelection = prefs.statSelection
 
                 // Attitude comes from the phone, so the navball and G-force
                 // readouts are live with no OBD hardware at all. The source
@@ -225,6 +227,17 @@ class GaugeScreen(
                 // the two crashes on 2026-08-24 did to that drive's figures.
                 recorder.recoveredTripStartDeltaV?.let { tripStartDeltaV = it }
 
+                // Start from the last known fuel estimate rather than the
+                // first tank reading. Also covers this screen being rebuilt
+                // mid-drive on every return from Maps, which used to re-seed
+                // the tracker from one reading each time.
+                prefs.carriedFuelKg(System.currentTimeMillis())?.let { kg ->
+                    fuelTracker.carryOver(kg)
+                    if (fuelTracker.isSeeded) {
+                        recorder.event("fuel carried over: ${"%.2f".format(kg)} kg")
+                    }
+                }
+
                 running = true
                 handler.post(frameTick)
             }
@@ -249,6 +262,9 @@ class GaugeScreen(
                         "byProvider[alt/total]: ${imu.gpsProviderSummary()}"
                 )
 
+                if (fuelTracker.isSeeded) {
+                    prefs.saveFuelEstimate(fuelTracker.fuelKg, System.currentTimeMillis())
+                }
                 recorder.stop()
                 radar.clear()
 
@@ -390,23 +406,39 @@ class GaugeScreen(
         else (nowNanos - lastFuelUpdateNanos) / 1_000_000_000.0
         lastFuelUpdateNanos = nowNanos
 
-        val tankFraction = if (isLive) {
-            poller.cursor.fresh(ObdPid.FUEL_LEVEL, now)
-                ?.let { ObdPid.decodeFuelLevelFraction(it.data) }
-        } else null
+        val tankReading = if (isLive) poller.cursor.fresh(ObdPid.FUEL_LEVEL, now) else null
+        val tankFraction = tankReading?.let { ObdPid.decodeFuelLevelFraction(it.data) }
 
-        // Seeding takes the first agreeing readings whole; the slow filter
-        // only takes over once there is something to correct.
-        if (tankFraction != null && !fuelTracker.isSeeded) {
-            fuelTracker.seed(tankFraction)
+        // Seeding takes the first agreeing readings whole (or checks a
+        // carried-over figure against them); the slow filter only takes over
+        // once there is something to correct.
+        //
+        // The POLL timestamp goes with each reading. This runs every frame
+        // and the cursor returns the same cached reading for its whole fresh
+        // window, so without it one poll counted as all five seed readings.
+        if (tankFraction != null && tankReading != null && fuelTracker.wantsSeedReadings) {
+            fuelTracker.seed(tankFraction, tankReading.atMillis)
+            if (fuelTracker.isConfirmed) {
+                recorder.event(
+                    "fuel ${fuelTracker.lastConfirmation?.name?.lowercase()}: " +
+                        "${"%.2f".format(fuelTracker.fuelKg)} kg"
+                )
+            }
         }
         if (fuelDt > 0.0 && fuelDt < 2.0) {
             fuelTracker.update(
                 fuelFlowKgPerSec = sample.fuelFlowKgPerSec,
                 speedMps = sample.speedMps,
                 dtSec = fuelDt,
-                tankLevelFraction = if (fuelTracker.isSeeded) tankFraction else null
+                tankLevelFraction = if (fuelTracker.isConfirmed) tankFraction else null
             )
+        }
+
+        // Persist the estimate for the next drive -- and for this screen's
+        // next incarnation, since Maps tears it down mid-drive.
+        if (fuelTracker.isSeeded && now - lastFuelSaveAt >= FUEL_SAVE_INTERVAL_MS) {
+            prefs.saveFuelEstimate(fuelTracker.fuelKg, System.currentTimeMillis())
+            lastFuelSaveAt = now
         }
 
         // ONCE SEEDED, THE TRACKER IS THE AUTHORITY -- link state included.
@@ -438,7 +470,7 @@ class GaugeScreen(
         // same fabricated "half a tank" that produced the 7,273 m/s spikes.
         // Waiting for a seeded tracker means the reference is a real
         // reading of the real tank.
-        if (tripStartDeltaV == null && isLive && fuelTracker.isSeeded &&
+        if (tripStartDeltaV == null && isLive && fuelTracker.isConfirmed &&
             readout.deltaVRemaining > 0.0
         ) {
             tripStartDeltaV = readout.deltaVRemaining
@@ -614,6 +646,12 @@ class GaugeScreen(
          * original ANR.
          */
         const val FRAME_INTERVAL_MS = 50L
+
+        /**
+         * How often the fuel estimate is persisted for carry-over. A crash
+         * loses at most this much burn -- at cruise, a few grams.
+         */
+        const val FUEL_SAVE_INTERVAL_MS = 30_000L
 
         /**
          * ND2 tank capacity, US gallons.
